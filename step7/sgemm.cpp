@@ -91,68 +91,69 @@ void mcxkc_sgemm(int m, int n, int k, const float *packa, const float *packb, fl
             "vmovups    32(%3, %%r11), %%ymm11       \n\t"
             "movl %0, %%r12d                                           \n\t"
             "testl %%r12d, %%r12d                                           \n\t"
-            "je .END                                           \n\t"
+            "je .REMAIN                                           \n\t"
             ".LOOP:                                     \n\t"
+            "vbroadcastss    (%%r13), %%ymm15       \n\t"
+            "vmovups    (%%r14), %%ymm12       \n\t"
+            "vmovups    32(%%r14), %%ymm13       \n\t"
+            "addq $64, %%r14                          \n\t"
+
+            "vbroadcastss    4(%%r13), %%ymm14       \n\t"
+            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm0       \n\t"
+            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm1       \n\t"
+
+            "vbroadcastss    8(%%r13), %%ymm15       \n\t"
+            "vfmadd231ps    %%ymm12, %%ymm14, %%ymm2       \n\t"
+            "vfmadd231ps    %%ymm13, %%ymm14, %%ymm3       \n\t"
+
+            "vbroadcastss    12(%%r13), %%ymm14       \n\t"
+            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm4       \n\t"
+            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm5       \n\t"
+
+            "vbroadcastss    16(%%r13), %%ymm15       \n\t"
+            "vfmadd231ps    %%ymm12, %%ymm14, %%ymm6       \n\t"
+            "vfmadd231ps    %%ymm13, %%ymm14, %%ymm7       \n\t"
+
+            "vbroadcastss    20(%%r13), %%ymm14       \n\t"
+            "addq $24, %%r13                          \n\t"
+            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm8       \n\t"
+            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm9       \n\t"
+
+            "vbroadcastss    (%%r13), %%ymm15       \n\t"
+            "vfmadd231ps    %%ymm12, %%ymm14, %%ymm10       \n\t"
+            "vfmadd231ps    %%ymm13, %%ymm14, %%ymm11       \n\t"
+
             "vmovups    (%%r14), %%ymm12       \n\t"
             "vmovups    32(%%r14), %%ymm13       \n\t"
 
             "addq $64, %%r14                          \n\t"
-            "vbroadcastss    (%%r13), %%ymm15       \n\t"
+            "vbroadcastss    4(%%r13), %%ymm14       \n\t"
             "vfmadd231ps    %%ymm12, %%ymm15, %%ymm0       \n\t"
             "vfmadd231ps    %%ymm13, %%ymm15, %%ymm1       \n\t"
 
-            "vbroadcastss    4(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm2       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm3       \n\t"
-
             "vbroadcastss    8(%%r13), %%ymm15       \n\t"
+            "vfmadd231ps    %%ymm12, %%ymm14, %%ymm2       \n\t"
+            "vfmadd231ps    %%ymm13, %%ymm14, %%ymm3       \n\t"
+
+            "vbroadcastss    12(%%r13), %%ymm14       \n\t"
             "vfmadd231ps    %%ymm12, %%ymm15, %%ymm4       \n\t"
             "vfmadd231ps    %%ymm13, %%ymm15, %%ymm5       \n\t"
 
-            "vbroadcastss    12(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm6       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm7       \n\t"
-
             "vbroadcastss    16(%%r13), %%ymm15       \n\t"
+            "vfmadd231ps    %%ymm12, %%ymm14, %%ymm6       \n\t"
+            "vfmadd231ps    %%ymm13, %%ymm14, %%ymm7       \n\t"
+
+            "vbroadcastss    20(%%r13), %%ymm14       \n\t"
             "vfmadd231ps    %%ymm12, %%ymm15, %%ymm8       \n\t"
             "vfmadd231ps    %%ymm13, %%ymm15, %%ymm9       \n\t"
 
-            "vbroadcastss    20(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm10       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm11       \n\t"
-
             "addq $24, %%r13                          \n\t"
-            "vmovups    (%%r14), %%ymm12       \n\t"
-            "vmovups    32(%%r14), %%ymm13       \n\t"
+            "vfmadd231ps    %%ymm12, %%ymm14, %%ymm10       \n\t"
+            "vfmadd231ps    %%ymm13, %%ymm14, %%ymm11       \n\t"
 
-            "addq $64, %%r14                          \n\t"
-            "vbroadcastss    (%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm0       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm1       \n\t"
-
-            "vbroadcastss    4(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm2       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm3       \n\t"
-
-            "vbroadcastss    8(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm4       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm5       \n\t"
-
-            "vbroadcastss    12(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm6       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm7       \n\t"
-
-            "vbroadcastss    16(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm8       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm9       \n\t"
-
-            "vbroadcastss    20(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm10       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm11       \n\t"
-
-            "addq $24, %%r13                          \n\t"
             "decl %%r12d                                \n\t"
             "jne .LOOP                              \n\t"
+            ".REMAIN:                             \n\t"
             "testl %5, %5                              \n\t"
             "je .STORE                               \n\t"
 

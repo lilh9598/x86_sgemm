@@ -1,6 +1,6 @@
 #include "sgemm.h"
 
-int main(int argc,char *argv[]) {
+int main(int argc, char *argv[]) {
     int M = 1024;
     int N = 1024;
     int K = 1024;
@@ -47,7 +47,7 @@ int main(int argc,char *argv[]) {
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
         double perf = FLOPS * iteration / (elapsed + 0.0001) / 1000.f / 1000.f;
         printf("reference_sgemm perf        : %.5lf gflop/s\n", perf);
-        printf("reference_sgemm duration    : %d ms\n", elapsed);
+        printf("reference_sgemm duration    : %d ms\n", elapsed / iteration);
     }
 
     {
@@ -60,7 +60,7 @@ int main(int argc,char *argv[]) {
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
         double perf = FLOPS * iteration / (elapsed + 0.0001) / 1000.f / 1000.f;
         printf("my_sgemm perf               : %.5lf gflop/s\n", perf);
-        printf("my_sgemm duration           : %d ms\n", elapsed);
+        printf("my_sgemm duration           : %d ms\n", elapsed / iteration);
     }
 
     delete[] a;
