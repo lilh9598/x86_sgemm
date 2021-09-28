@@ -12,6 +12,7 @@
 #define MR 6
 #define NR 16
 
+#define MEM_ALIGN 64
 // A L2 : Kc * Mc * 4 < 256KB
 // B L3 : Kc * N * 4
 // packb L1 : 16 * kc * 4 < 32K
@@ -46,4 +47,23 @@ static bool consistency_check(const float *c, const float *ref_c, int m, int n, 
         }
     }
     return true;
+}
+
+static void *aligned_malloc(size_t required_bytes, size_t alignment = MEM_ALIGN) {
+    int offset = alignment - 1 + sizeof(void *);
+
+    void *p1 = (void *)malloc(required_bytes + offset);
+
+    if (p1 == NULL) return NULL;
+
+    void **p2 = (void **)(((size_t)p1 + offset) & ~(alignment - 1));
+
+    p2[-1] = p1;
+
+    return p2;
+}
+
+static void aligned_free(void *p2) {
+    void *p1 = ((void **)p2)[-1];
+    free(p1);
 }

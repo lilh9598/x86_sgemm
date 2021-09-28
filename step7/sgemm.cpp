@@ -10,8 +10,8 @@ void packB_Kcxn(const float *b, int ldb, int k, int nr, float *packb);
 void packA_KcxMc(const float *a, int lda, int k, int mr, float *packa);
 
 void my_sgemm(int m, int n, int k, const float *a, int lda, const float *b, int ldb, float *c, int ldc) {
-    float *packb = new float[ROUND_UP(n, NR) * Kc];
-    float *packa = new float[ROUND_UP(Mc, MR) * Kc];
+    float *packb = (float*)aligned_malloc((ROUND_UP(n, NR) * Kc)*sizeof(float));
+    float *packa = (float*)aligned_malloc((ROUND_UP(Mc, MR) * Kc)*sizeof(float));
     for (int p = 0; p < k; p += Kc) {
         int pb = min(Kc, k - p);
 
@@ -29,9 +29,8 @@ void my_sgemm(int m, int n, int k, const float *a, int lda, const float *b, int 
             mcxkc_sgemm(ib, n, pb, packa, packb, &C(i, 0), ldc);
         }
     }
-
-    delete []packb;
-    delete []packa;
+    aligned_free(packb);
+    aligned_free(packa);
 }
 
 void packA_KcxMc(const float *a, int lda, int k, int mr, float *packa) {
