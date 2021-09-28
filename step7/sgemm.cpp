@@ -36,7 +36,7 @@ void my_sgemm(int m, int n, int k, const float *a, int lda, const float *b, int 
 void packA_KcxMc(const float *a, int lda, int k, int mr, float *packa) {
     const float *pack_ptr[MR];
     for (int i = 0; i < mr; i++) {
-        pack_ptr[i] = a + i * lda;
+        pack_ptr[i] = a + i;
     }
 
     for (int i = mr; i < MR; i++) {
@@ -45,7 +45,8 @@ void packA_KcxMc(const float *a, int lda, int k, int mr, float *packa) {
 
     for (int p = 0; p < k; p++) {
         for (int i = 0; i < MR; i++) {
-            *packa++ = *pack_ptr[i]++;
+            *packa++ = *pack_ptr[i];
+            pack_ptr[i] += lda;
         }
     }
 }
@@ -53,15 +54,14 @@ void packA_KcxMc(const float *a, int lda, int k, int mr, float *packa) {
 void packB_Kcxn(const float *b, int ldb, int k, int nr, float *packb) {
     const float *pack_ptr[NR];
     for (int i = 0; i < nr; i++) {
-        pack_ptr[i] = b + i;
+        pack_ptr[i] = b + i * ldb;
     }
     for (int i = nr; i < NR; i++) {
         pack_ptr[i] = b;
     }
     for (int p = 0; p < k; p++) {
         for (int i = 0; i < NR; i++) {
-            *packb++ = *pack_ptr[i];
-            pack_ptr[i] += ldb;
+            *packb++ = *pack_ptr[i]++;
         }
     }
 }
@@ -71,7 +71,7 @@ void mcxkc_sgemm(int m, int n, int k, const float *packa, const float *packb, fl
     int k_remain = k % 2;
     for (int j = 0; j < n; j += NR) {
         for (int i = 0; i < m; i += MR) {
-            __asm__ volatile(
+                        __asm__ volatile(
             "leaq       (, %4, 4), %%r10           \n\t" // 0 * ldc
             "leaq       (%%r10, %%r10, 2), %%r11           \n\t"
             "vmovups    (%3), %%ymm0                \n\t"  // c(0,0)
@@ -205,14 +205,15 @@ void mcxkc_sgemm(int m, int n, int k, const float *packa, const float *packb, fl
             :                    // output operands (none)
             :                    // input operands
             "r"(k_iter),         // 0
-            "r"(packa + i * k),  // 1
-            "r"(packb + j * k),  // 2
+            "r"(packb + j * k),  // 1
+            "r"(packa + i * k),  // 2
             "r"(&C(i, j)),       // 3
             "r"(ldc),             // 4
             "r"(k_remain)        // 5
             :                    // register clobber list
             "r10", "r11", "r12", "r13", "r14", "rax", "rbx", "memory", "ymm0", "ymm1", "ymm2", "ymm3", "ymm4",
             "ymm5", "ymm6", "ymm7", "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15");
+
         }
     }
 }

@@ -6,19 +6,19 @@
 #include <iostream>
 
 // 不支持尾处理 Mc / MR， N / NR 必须没有余数
-#define Mc 144
-#define Kc 512
+#define Mc 192
+#define Kc 256
 
-#define MR 6
-#define NR 16
+#define MR 16
+#define NR 6
 
 #define MEM_ALIGN 64
 // A L2 : Kc * Mc * 4 < 256KB
 // B L3 : Kc * N * 4
 // packb L1 : 16 * kc * 4 < 32K
-#define A(i, j) a[(i)*lda + j]
-#define B(i, j) b[(i)*ldb + j]
-#define C(i, j) c[(i)*ldc + j]
+#define A(i, j) a[(j)*lda + i]
+#define B(i, j) b[(j)*ldb + i]
+#define C(i, j) c[(j)*ldc + i]
 
 #define ROUND_UP(x, y) ((((x) + (y)-1) / (y)) * y)
 #define min(x, y) ((x) < (y) ? (x) : (y))
@@ -40,8 +40,8 @@ static void reference_sgemm(int m, int n, int k, const float *a, int lda, const 
 static bool consistency_check(const float *c, const float *ref_c, int m, int n, int ldc, int ldc_ref) {
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
-            if (std::fabs(c[i * ldc + j] - ref_c[i * ldc_ref + j]) > 0.01) {
-                printf("Error! %f != %f at [%d, %d]\n", c[i * ldc + j], ref_c[i * ldc_ref + j], i, j);
+            if (std::fabs(c[j * ldc + i] - ref_c[j * ldc_ref + i]) > 0.01) {
+                printf("Error! %f != %f at [%d, %d]\n", c[j * ldc + i], ref_c[j * ldc_ref + i], i, j);
                 return false;
             }
         }

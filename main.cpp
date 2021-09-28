@@ -10,8 +10,11 @@ int main(int argc, char *argv[]) {
         K = std::atoi(argv[3]);
     }
 
-    int ldc = ROUND_UP(N, NR);
-    float *c = new float[(ROUND_UP(M, MR)) * ldc];
+    int ldc = ROUND_UP(M, MR);
+    int ldc_ref = M;
+    int lda = M;
+    int ldb = K;
+    float *c = new float[ROUND_UP(M, MR) * ROUND_UP(N, NR)];
     float *ref_c = new float[M * N];
     float *a = new float[M * K];
     float *b = new float[K * N];
@@ -21,8 +24,8 @@ int main(int argc, char *argv[]) {
     std::generate(a, a + M * K, []() { return (rand() % 1000) / 1000.f - 0.5f; });
     std::generate(b, b + K * N, []() { return (rand() % 1000) / 1000.f - 0.5f; });
 
-    reference_sgemm(M, N, K, a, K, b, N, ref_c, N);
-    my_sgemm(M, N, K, a, K, b, N, c, ldc);
+    reference_sgemm(M, N, K, a, lda, b, ldb, ref_c, ldc_ref);
+    my_sgemm(M, N, K, a, lda, b, ldb, c, ldc);
 
     if (!consistency_check(c, ref_c, M, N, ldc, N)) {
         printf("check fail\n");
@@ -54,7 +57,7 @@ int main(int argc, char *argv[]) {
         const int iteration = 50;
         auto begin = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < iteration; i++) {
-            my_sgemm(M, N, K, a, K, b, N, c, ldc);
+            my_sgemm(M, N, K, a, lda, b, ldb, c, ldc);
         }
         auto end = std::chrono::high_resolution_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
