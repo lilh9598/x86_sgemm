@@ -1,5 +1,4 @@
 #include "../sgemm.h"
-
 #include <immintrin.h>
 
 void kernel_16x6(int k, const float *packa, const float *b, float *c, int ldc);

@@ -2,7 +2,6 @@
 
 #include <immintrin.h>
 
-
 void mcxkc_sgemm(int m, int n, int k, const float *packa, const float *packb, float *c, int ldc);
 
 void packB_Kcxn(const float *b, int ldb, int k, int nr, float *packb);
@@ -67,28 +66,28 @@ void packB_Kcxn(const float *b, int ldb, int k, int nr, float *packb) {
 }
 
 void mcxkc_sgemm(int m, int n, int k, const float *packa, const float *packb, float *c, int ldc) {
-    int k_iter = k / 2;
-    int k_remain = k % 2;
+    int k_iter = k >> 1;
+    int k_remain = k & 1;
     for (int j = 0; j < n; j += NR) {
         for (int i = 0; i < m; i += MR) {
-                        __asm__ volatile(
+            __asm__ volatile(
             "leaq       (, %4, 4), %%r10           \n\t" // 0 * ldc
-            "leaq       (%%r10, %%r10, 2), %%r11           \n\t"
+            "leaq       (%%r10, %%r10, 2), %%r13           \n\t"
             "vmovups    (%3), %%ymm0                \n\t"  // c(0,0)
             "vmovups    32(%3), %%ymm1               \n\t"
             "vmovups    (%3, %%r10), %%ymm2           \n\t"  // c(1,0)
             "vmovups    32(%3, %%r10), %%ymm3           \n\t"
             "vmovups    (%3, %%r10, 2), %%ymm4        \n\t"  // c(2,0)
             "vmovups    32(%3, %%r10, 2), %%ymm5        \n\t"
-            "vmovups    (%3, %%r11), %%ymm6        \n\t"  // c(3,0)
-            "vmovups    32(%3, %%r11), %%ymm7        \n\t"
-            "leaq       (%%r11, %%r10, 2), %%r11           \n\t"
+            "leaq       (%%r13, %%r10, 2), %%r11           \n\t"
+            "vmovups    (%3, %%r13), %%ymm6        \n\t"  // c(3,0)
+            "vmovups    32(%3, %%r13), %%ymm7        \n\t"
             "vmovups    (%3, %%r10, 4), %%ymm8        \n\t"  // c(4,0)
             "vmovups    32(%3, %%r10, 4), %%ymm9        \n\t"
-            "movq %2, %%r14                                           \n\t"
-            "movq %1, %%r13                                           \n\t"
             "vmovups    (%3, %%r11), %%ymm10       \n\t"  // c(5,0)
             "vmovups    32(%3, %%r11), %%ymm11       \n\t"
+            "movq %2, %%r14                                           \n\t"
+            "movq %1, %%r13                                           \n\t"
             "movl %0, %%r12d                                           \n\t"
             "testl %%r12d, %%r12d                                           \n\t"
             "je .REMAIN                                           \n\t"
@@ -184,23 +183,20 @@ void mcxkc_sgemm(int m, int n, int k, const float *packa, const float *packb, fl
             "vfmadd231ps    %%ymm12, %%ymm15, %%ymm10       \n\t"
             "vfmadd231ps    %%ymm13, %%ymm15, %%ymm11       \n\t"
             ".STORE:                                     \n\t"
+            "leaq       (%%r10, %%r10, 2), %%r11           \n\t"
             "vmovups    %%ymm0, (%3)                \n\t"  // c(0,0)
             "vmovups    %%ymm1, 32(%3)               \n\t"
-            "movq       %%r10, %%r11               \n\t"
-            "vmovups    %%ymm2, (%3, %%r11)           \n\t"  // c(1,0)
-            "vmovups    %%ymm3, 32(%3, %%r11)           \n\t"
-            "addq       %%r10, %%r11           \n\t"
-            "vmovups    %%ymm4, (%3, %%r11)        \n\t"  // c(2,0)
-            "vmovups    %%ymm5, 32(%3, %%r11)        \n\t"
-            "addq       %%r10, %%r11           \n\t"
+            "vmovups    %%ymm2, (%3, %%r10)           \n\t"  // c(1,0)
+            "vmovups    %%ymm3, 32(%3, %%r10)           \n\t"
+            "vmovups    %%ymm4, (%3, %%r10, 2)        \n\t"  // c(2,0)
+            "vmovups    %%ymm5, 32(%3, %%r10, 2)        \n\t"
+            "leaq       (%%r11, %%r10, 2), %%r13           \n\t"
             "vmovups    %%ymm6, (%3, %%r11)        \n\t"  // c(3,0)
             "vmovups    %%ymm7, 32(%3, %%r11)        \n\t"
-            "addq       %%r10, %%r11           \n\t"
-            "vmovups    %%ymm8, (%3, %%r11)        \n\t"  // c(4,0)
-            "vmovups    %%ymm9, 32(%3, %%r11)        \n\t"
-            "addq       %%r10, %%r11           \n\t"
-            "vmovups    %%ymm10, (%3, %%r11)       \n\t"  // c(5,0)
-            "vmovups    %%ymm11, 32(%3, %%r11)       \n\t"
+            "vmovups    %%ymm8, (%3, %%r10, 4)        \n\t"  // c(4,0)
+            "vmovups    %%ymm9, 32(%3, %%r10, 4)        \n\t"
+            "vmovups    %%ymm10, (%3, %%r13)       \n\t"  // c(5,0)
+            "vmovups    %%ymm11, 32(%3, %%r13)       \n\t"
             ".END:                                     \n\t"
             :                    // output operands (none)
             :                    // input operands
@@ -211,7 +207,7 @@ void mcxkc_sgemm(int m, int n, int k, const float *packa, const float *packb, fl
             "r"(ldc),             // 4
             "r"(k_remain)        // 5
             :                    // register clobber list
-            "r10", "r11", "r12", "r13", "r14", "rax", "rbx", "memory", "ymm0", "ymm1", "ymm2", "ymm3", "ymm4",
+            "r10", "r11", "r12", "r13", "r14", "memory", "ymm0", "ymm1", "ymm2", "ymm3", "ymm4",
             "ymm5", "ymm6", "ymm7", "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15");
 
         }

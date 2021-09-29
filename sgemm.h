@@ -5,12 +5,11 @@
 #include <cstring>
 #include <iostream>
 
-// 不支持尾处理 Mc / MR， N / NR 必须没有余数
-#define Mc 192
-#define Kc 256
-
 #define MR 16
 #define NR 6
+
+#define Mc 192
+#define Kc 256
 
 #define MEM_ALIGN 64
 // A L2 : Kc * Mc * 4 < 256KB
