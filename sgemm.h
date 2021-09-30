@@ -8,13 +8,14 @@
 #define MR 16
 #define NR 6
 
-#define Mc 192
+#define Mc 256
 #define Kc 256
 
 #define MEM_ALIGN 64
-// A L2 : Kc * Mc * 4 < 256KB
+// A L2 : Kc * Mc * 4 < L2
 // B L3 : Kc * N * 4
-// packb L1 : 16 * kc * 4 < 32K
+// packb L1 : 16 * kc * 4 < L1
+
 #define A(i, j) a[(j)*lda + i]
 #define B(i, j) b[(j)*ldb + i]
 #define C(i, j) c[(j)*ldc + i]

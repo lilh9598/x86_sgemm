@@ -55,15 +55,17 @@ int main(int argc, char *argv[]) {
 
     {
         const int iteration = 50;
+        float *n_c = new float[iteration * ROUND_UP(M, MR) * ROUND_UP(N, NR)];
         auto begin = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < iteration; i++) {
-            my_sgemm(M, N, K, a, lda, b, ldb, c, ldc);
+            my_sgemm(M, N, K, a, lda, b, ldb, n_c + i * ROUND_UP(M, MR) * ROUND_UP(N, NR), ldc);
         }
         auto end = std::chrono::high_resolution_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
         double perf = FLOPS * iteration / (elapsed + 0.0001) / 1000.f / 1000.f;
         printf("my_sgemm perf               : %.5lf gflop/s\n", perf);
         printf("my_sgemm duration           : %d ms\n", elapsed / iteration);
+        delete []n_c;
     }
 
     delete[] a;
