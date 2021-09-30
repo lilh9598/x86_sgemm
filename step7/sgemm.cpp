@@ -54,7 +54,7 @@ void packA_KcxMc(const float *a, int lda, int k, int mr, float *packa) {
             packa += 8;
             i += 8;
         }
-        while (i < m_r) {
+        while (i < mr) {
             packa[i] = a[i];
             i++;
         }
