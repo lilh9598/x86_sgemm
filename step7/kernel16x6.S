@@ -1,6 +1,5 @@
 .global kernel_16x6
 kernel_16x6:
-        pushq   %r14
         pushq   %r13
         pushq   %r12
         movl    %edi, %eax
@@ -21,15 +20,14 @@ kernel_16x6:
         vmovups 32(%rcx,%r10,4), %ymm9
         vmovups (%rcx,%r11), %ymm10
         vmovups 32(%rcx,%r11), %ymm11
-        movq    %rsi, %r14
         movq    %rdx, %r13
         movl    %eax, %r12d
         testl   %r12d, %r12d
         je      .REMAIN
 .LOOP:
         vbroadcastss    (%r13), %ymm15
-        vmovups (%r14), %ymm12
-        vmovups 32(%r14), %ymm13
+        vmovups (%rsi), %ymm12
+        vmovups 32(%rsi), %ymm13
         vbroadcastss    4(%r13), %ymm14
         vfmadd231ps     %ymm12, %ymm15, %ymm0   # ymm0 = (ymm15 * ymm12) + ymm0
         vfmadd231ps     %ymm13, %ymm15, %ymm1   # ymm1 = (ymm15 * ymm13) + ymm1
@@ -48,9 +46,9 @@ kernel_16x6:
         vbroadcastss    24(%r13), %ymm15
         vfmadd231ps     %ymm12, %ymm14, %ymm10  # ymm10 = (ymm14 * ymm12) + ymm10
         vfmadd231ps     %ymm13, %ymm14, %ymm11  # ymm11 = (ymm14 * ymm13) + ymm11
-        vmovups 64(%r14), %ymm12
-        vmovups 96(%r14), %ymm13
-        addq    $128, %r14
+        vmovups 64(%rsi), %ymm12
+        vmovups 96(%rsi), %ymm13
+        addq    $128, %rsi
         vbroadcastss    28(%r13), %ymm14
         vfmadd231ps     %ymm12, %ymm15, %ymm0   # ymm0 = (ymm15 * ymm12) + ymm0
         vfmadd231ps     %ymm13, %ymm15, %ymm1   # ymm1 = (ymm15 * ymm13) + ymm1
@@ -74,8 +72,8 @@ kernel_16x6:
 .REMAIN:
         testl   %edi, %edi
         je      .STORE
-        vmovups (%r14), %ymm12
-        vmovups 32(%r14), %ymm13
+        vmovups (%rsi), %ymm12
+        vmovups 32(%rsi), %ymm13
         vbroadcastss    (%r13), %ymm15
         vfmadd231ps     %ymm12, %ymm15, %ymm0   # ymm0 = (ymm15 * ymm12) + ymm0
         vfmadd231ps     %ymm13, %ymm15, %ymm1   # ymm1 = (ymm15 * ymm13) + ymm1
@@ -112,6 +110,5 @@ kernel_16x6:
 
         popq    %r12
         popq    %r13
-        popq    %r14
         vzeroupper
         retq

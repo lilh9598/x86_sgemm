@@ -35,20 +35,30 @@ void my_sgemm(int m, int n, int k, const float *a, int lda, const float *b, int 
 }
 
 void packA_KcxMc(const float *a, int lda, int k, int mr, float *packa) {
-    const float *pack_ptr[MR];
-    for (int i = 0; i < mr; i++) {
-        pack_ptr[i] = a + i;
-    }
-
-    for (int i = mr; i < MR; i++) {
-        pack_ptr[i] = a;
-    }
-
+    int m_r16 = mr & ~15;
+    int m_r8 = mr & ~7;
     for (int p = 0; p < k; p++) {
-        for (int i = 0; i < MR; i++) {
-            *packa++ = *pack_ptr[i];
-            pack_ptr[i] += lda;
+        int i = 0;
+        while (i < m_r16) {
+            auto v1 = _mm256_loadu_ps(a);
+            auto v2 = _mm256_loadu_ps(a + 8);
+            _mm256_storeu_ps(packa, v1);
+            _mm256_storeu_ps(packa + 8, v2);
+            packa += 16;
+            i += 16;
         }
+
+        while (i < m_r8) {
+            auto v1 = _mm256_loadu_ps(a);
+            _mm256_storeu_ps(packa, v1);
+            packa += 8;
+            i += 8;
+        }
+        while (i < m_r) {
+            packa[i] = a[i];
+            i++;
+        }
+        a += lda;
     }
 }
 
