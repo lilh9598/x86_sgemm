@@ -5,6 +5,7 @@
 #include <cstring>
 #include <iostream>
 
+// M N 必须是MR NR的倍数
 #define MR 16
 #define NR 6
 
@@ -24,8 +25,6 @@
 #define min(x, y) ((x) < (y) ? (x) : (y))
 
 void my_sgemm(int m, int n, int k, const float *a, int lda, const float *b, int ldb, float *c, int ldc);
-
-void kernel_16x6(int k, const float *packa, const float *packb, float *c, int ldc);
 
 static void reference_sgemm(int m, int n, int k, const float *a, int lda, const float *b, int ldb, float *c, int ldc) {
     for (int i = 0; i < m; i++) {

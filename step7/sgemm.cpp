@@ -1,6 +1,9 @@
 #include "../sgemm.h"
 
+#include <emmintrin.h>
 #include <immintrin.h>
+
+extern "C" void kernel_16x6(int k, const float *packa, const float *b, float *c, int ldc);
 
 void mcxkc_sgemm(int m, int n, int k, const float *packa, const float *packb, float *c, int ldc);
 
@@ -9,8 +12,8 @@ void packB_Kcxn(const float *b, int ldb, int k, int nr, float *packb);
 void packA_KcxMc(const float *a, int lda, int k, int mr, float *packa);
 
 void my_sgemm(int m, int n, int k, const float *a, int lda, const float *b, int ldb, float *c, int ldc) {
-    float *packb = (float*)aligned_malloc((ROUND_UP(n, NR) * Kc)*sizeof(float));
-    float *packa = (float*)aligned_malloc((ROUND_UP(Mc, MR) * Kc)*sizeof(float));
+    float *packb = (float *)aligned_malloc((ROUND_UP(n, NR) * Kc) * sizeof(float));
+    float *packa = (float *)aligned_malloc((ROUND_UP(Mc, MR) * Kc) * sizeof(float));
     for (int p = 0; p < k; p += Kc) {
         int pb = min(Kc, k - p);
 
@@ -33,183 +36,71 @@ void my_sgemm(int m, int n, int k, const float *a, int lda, const float *b, int 
 }
 
 void packA_KcxMc(const float *a, int lda, int k, int mr, float *packa) {
-    const float *pack_ptr[MR];
-    for (int i = 0; i < mr; i++) {
-        pack_ptr[i] = a + i;
-    }
-
-    for (int i = mr; i < MR; i++) {
-        pack_ptr[i] = a;
-    }
-
+    int m_r16 = mr & ~15;
+    int m_r8 = mr & ~7;
     for (int p = 0; p < k; p++) {
-        for (int i = 0; i < MR; i++) {
-            *packa++ = *pack_ptr[i];
-            pack_ptr[i] += lda;
+        int i = 0;
+        while (i < m_r16) {
+            auto v1 = _mm256_loadu_ps(a);
+            auto v2 = _mm256_loadu_ps(a + 8);
+            _mm256_storeu_ps(packa + i, v1);
+            _mm256_storeu_ps(packa + 8 + i, v2);
+            i += 16;
         }
+        while (i < m_r8) {
+            auto v1 = _mm256_loadu_ps(a);
+            _mm256_storeu_ps(packa + i, v1);
+            i += 8;
+        }
+        while (i < mr) {
+            packa[i] = a[i];
+            i++;
+        }
+        packa += MR;
+        a += lda;
     }
 }
 
 void packB_Kcxn(const float *b, int ldb, int k, int nr, float *packb) {
-    const float *pack_ptr[NR];
-    for (int i = 0; i < nr; i++) {
-        pack_ptr[i] = b + i * ldb;
+    int nr4 = nr & ~3;
+    int k4 = k & ~3;
+    int p = 0;
+    for (; p < k4; p += 4) {
+        int i = 0;
+        auto packb_ptr = packb + p * NR;
+        while (i < nr4) {
+            auto v0 = _mm_loadu_ps(&B(p, i + 0));
+            auto v1 = _mm_loadu_ps(&B(p, i + 1));
+            auto v2 = _mm_loadu_ps(&B(p, i + 2));
+            auto v3 = _mm_loadu_ps(&B(p, i + 3));
+            _MM_TRANSPOSE4_PS(v0, v1, v2, v3);
+            _mm_storeu_ps(packb_ptr + i, v0);
+            _mm_storeu_ps(packb_ptr + i + NR, v1);
+            _mm_storeu_ps(packb_ptr + i + 2 * NR, v2);
+            _mm_storeu_ps(packb_ptr + i + 3 * NR, v3);
+            i += 4;
+        }
+
+        for (int pp = 0; pp < 4; pp++) {
+            auto packb_ptr_pp = packb_ptr + pp * NR + i;
+            for (int j = i; j < nr; j++) {
+                *packb_ptr_pp++ = B(p + pp, j);
+            }
+        }
     }
-    for (int i = nr; i < NR; i++) {
-        pack_ptr[i] = b;
-    }
-    for (int p = 0; p < k; p++) {
-        for (int i = 0; i < NR; i++) {
-            *packb++ = *pack_ptr[i]++;
+
+    for (; p < k; p++) {
+        auto packb_ptr = packb + p * NR;
+        for (int i = 0; i < nr; i++) {
+            *packb_ptr++ = B(p, i);
         }
     }
 }
 
 void mcxkc_sgemm(int m, int n, int k, const float *packa, const float *packb, float *c, int ldc) {
-    int k_iter = k >> 1;
-    int k_remain = k & 1;
     for (int j = 0; j < n; j += NR) {
         for (int i = 0; i < m; i += MR) {
-            __asm__ volatile(
-            "leaq       (, %4, 4), %%r10           \n\t" // 0 * ldc
-            "leaq       (%%r10, %%r10, 2), %%r13           \n\t"
-            "vmovups    (%3), %%ymm0                \n\t"  // c(0,0)
-            "vmovups    32(%3), %%ymm1               \n\t"
-            "vmovups    (%3, %%r10), %%ymm2           \n\t"  // c(1,0)
-            "vmovups    32(%3, %%r10), %%ymm3           \n\t"
-            "vmovups    (%3, %%r10, 2), %%ymm4        \n\t"  // c(2,0)
-            "vmovups    32(%3, %%r10, 2), %%ymm5        \n\t"
-            "leaq       (%%r13, %%r10, 2), %%r11           \n\t"
-            "vmovups    (%3, %%r13), %%ymm6        \n\t"  // c(3,0)
-            "vmovups    32(%3, %%r13), %%ymm7        \n\t"
-            "vmovups    (%3, %%r10, 4), %%ymm8        \n\t"  // c(4,0)
-            "vmovups    32(%3, %%r10, 4), %%ymm9        \n\t"
-            "vmovups    (%3, %%r11), %%ymm10       \n\t"  // c(5,0)
-            "vmovups    32(%3, %%r11), %%ymm11       \n\t"
-            "movq %2, %%r14                                           \n\t"
-            "movq %1, %%r13                                           \n\t"
-            "movl %0, %%r12d                                           \n\t"
-            "testl %%r12d, %%r12d                                           \n\t"
-            "je .REMAIN                                           \n\t"
-            ".LOOP:                                     \n\t"
-            "vbroadcastss    (%%r13), %%ymm15       \n\t"
-            "vmovups    (%%r14), %%ymm12       \n\t"
-            "vmovups    32(%%r14), %%ymm13       \n\t"
-            "addq $64, %%r14                          \n\t"
-
-            "vbroadcastss    4(%%r13), %%ymm14       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm0       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm1       \n\t"
-
-            "vbroadcastss    8(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm14, %%ymm2       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm14, %%ymm3       \n\t"
-
-            "vbroadcastss    12(%%r13), %%ymm14       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm4       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm5       \n\t"
-
-            "vbroadcastss    16(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm14, %%ymm6       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm14, %%ymm7       \n\t"
-
-            "vbroadcastss    20(%%r13), %%ymm14       \n\t"
-            "addq $24, %%r13                          \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm8       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm9       \n\t"
-
-            "vbroadcastss    (%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm14, %%ymm10       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm14, %%ymm11       \n\t"
-
-            "vmovups    (%%r14), %%ymm12       \n\t"
-            "vmovups    32(%%r14), %%ymm13       \n\t"
-
-            "addq $64, %%r14                          \n\t"
-            "vbroadcastss    4(%%r13), %%ymm14       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm0       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm1       \n\t"
-
-            "vbroadcastss    8(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm14, %%ymm2       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm14, %%ymm3       \n\t"
-
-            "vbroadcastss    12(%%r13), %%ymm14       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm4       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm5       \n\t"
-
-            "vbroadcastss    16(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm14, %%ymm6       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm14, %%ymm7       \n\t"
-
-            "vbroadcastss    20(%%r13), %%ymm14       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm8       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm9       \n\t"
-
-            "addq $24, %%r13                          \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm14, %%ymm10       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm14, %%ymm11       \n\t"
-
-            "decl %%r12d                                \n\t"
-            "jne .LOOP                              \n\t"
-            ".REMAIN:                             \n\t"
-            "testl %5, %5                              \n\t"
-            "je .STORE                               \n\t"
-
-            "vmovups    (%%r14), %%ymm12       \n\t"
-            "vmovups    32(%%r14), %%ymm13       \n\t"
-
-            "vbroadcastss    (%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm0       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm1       \n\t"
-
-            "vbroadcastss    4(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm2       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm3       \n\t"
-
-            "vbroadcastss    8(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm4       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm5       \n\t"
-
-            "vbroadcastss    12(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm6       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm7       \n\t"
-
-            "vbroadcastss    16(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm8       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm9       \n\t"
-
-            "vbroadcastss    20(%%r13), %%ymm15       \n\t"
-            "vfmadd231ps    %%ymm12, %%ymm15, %%ymm10       \n\t"
-            "vfmadd231ps    %%ymm13, %%ymm15, %%ymm11       \n\t"
-            ".STORE:                                     \n\t"
-            "leaq       (%%r10, %%r10, 2), %%r11           \n\t"
-            "vmovups    %%ymm0, (%3)                \n\t"  // c(0,0)
-            "vmovups    %%ymm1, 32(%3)               \n\t"
-            "vmovups    %%ymm2, (%3, %%r10)           \n\t"  // c(1,0)
-            "vmovups    %%ymm3, 32(%3, %%r10)           \n\t"
-            "vmovups    %%ymm4, (%3, %%r10, 2)        \n\t"  // c(2,0)
-            "vmovups    %%ymm5, 32(%3, %%r10, 2)        \n\t"
-            "leaq       (%%r11, %%r10, 2), %%r13           \n\t"
-            "vmovups    %%ymm6, (%3, %%r11)        \n\t"  // c(3,0)
-            "vmovups    %%ymm7, 32(%3, %%r11)        \n\t"
-            "vmovups    %%ymm8, (%3, %%r10, 4)        \n\t"  // c(4,0)
-            "vmovups    %%ymm9, 32(%3, %%r10, 4)        \n\t"
-            "vmovups    %%ymm10, (%3, %%r13)       \n\t"  // c(5,0)
-            "vmovups    %%ymm11, 32(%3, %%r13)       \n\t"
-            ".END:                                     \n\t"
-            :                    // output operands (none)
-            :                    // input operands
-            "r"(k_iter),         // 0
-            "r"(packb + j * k),  // 1
-            "r"(packa + i * k),  // 2
-            "r"(&C(i, j)),       // 3
-            "r"(ldc),             // 4
-            "r"(k_remain)        // 5
-            :                    // register clobber list
-            "r10", "r11", "r12", "r13", "r14", "memory", "ymm0", "ymm1", "ymm2", "ymm3", "ymm4",
-            "ymm5", "ymm6", "ymm7", "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15");
-
+            kernel_16x6(k, packa + i * k, packb + j * k, &C(i, j), ldc);
         }
     }
 }
