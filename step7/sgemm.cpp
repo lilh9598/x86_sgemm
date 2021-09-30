@@ -1,5 +1,6 @@
 #include "../sgemm.h"
 
+#include <emmintrin.h>
 #include <immintrin.h>
 
 extern "C" void kernel_16x6(int k, const float *packa, const float *b, float *c, int ldc);
@@ -11,8 +12,8 @@ void packB_Kcxn(const float *b, int ldb, int k, int nr, float *packb);
 void packA_KcxMc(const float *a, int lda, int k, int mr, float *packa);
 
 void my_sgemm(int m, int n, int k, const float *a, int lda, const float *b, int ldb, float *c, int ldc) {
-    float *packb = (float*)aligned_malloc((ROUND_UP(n, NR) * Kc)*sizeof(float));
-    float *packa = (float*)aligned_malloc((ROUND_UP(Mc, MR) * Kc)*sizeof(float));
+    float *packb = (float *)aligned_malloc((ROUND_UP(n, NR) * Kc) * sizeof(float));
+    float *packa = (float *)aligned_malloc((ROUND_UP(Mc, MR) * Kc) * sizeof(float));
     for (int p = 0; p < k; p += Kc) {
         int pb = min(Kc, k - p);
 
@@ -42,37 +43,56 @@ void packA_KcxMc(const float *a, int lda, int k, int mr, float *packa) {
         while (i < m_r16) {
             auto v1 = _mm256_loadu_ps(a);
             auto v2 = _mm256_loadu_ps(a + 8);
-            _mm256_storeu_ps(packa, v1);
-            _mm256_storeu_ps(packa + 8, v2);
-            packa += 16;
+            _mm256_storeu_ps(packa + i, v1);
+            _mm256_storeu_ps(packa + 8 + i, v2);
             i += 16;
         }
-
         while (i < m_r8) {
             auto v1 = _mm256_loadu_ps(a);
-            _mm256_storeu_ps(packa, v1);
-            packa += 8;
+            _mm256_storeu_ps(packa + i, v1);
             i += 8;
         }
         while (i < mr) {
             packa[i] = a[i];
             i++;
         }
+        packa += MR;
         a += lda;
     }
 }
 
 void packB_Kcxn(const float *b, int ldb, int k, int nr, float *packb) {
-    const float *pack_ptr[NR];
-    for (int i = 0; i < nr; i++) {
-        pack_ptr[i] = b + i * ldb;
+    int nr4 = nr & ~3;
+    int k4 = k & ~3;
+    int p = 0;
+    for (; p < k4; p += 4) {
+        int i = 0;
+        auto packb_ptr = packb + p * NR;
+        while (i < nr4) {
+            auto v0 = _mm_loadu_ps(&B(p, i + 0));
+            auto v1 = _mm_loadu_ps(&B(p, i + 1));
+            auto v2 = _mm_loadu_ps(&B(p, i + 2));
+            auto v3 = _mm_loadu_ps(&B(p, i + 3));
+            _MM_TRANSPOSE4_PS(v0, v1, v2, v3);
+            _mm_storeu_ps(packb_ptr + i, v0);
+            _mm_storeu_ps(packb_ptr + i + NR, v1);
+            _mm_storeu_ps(packb_ptr + i + 2 * NR, v2);
+            _mm_storeu_ps(packb_ptr + i + 3 * NR, v3);
+            i += 4;
+        }
+
+        for (int pp = 0; pp < 4; pp++) {
+            auto packb_ptr_pp = packb_ptr + pp * NR + i;
+            for (int j = i; j < nr; j++) {
+                *packb_ptr_pp++ = B(p + pp, j);
+            }
+        }
     }
-    for (int i = nr; i < NR; i++) {
-        pack_ptr[i] = b;
-    }
-    for (int p = 0; p < k; p++) {
-        for (int i = 0; i < NR; i++) {
-            *packb++ = *pack_ptr[i]++;
+
+    for (; p < k; p++) {
+        auto packb_ptr = packb + p * NR;
+        for (int i = 0; i < nr; i++) {
+            *packb_ptr++ = B(p, i);
         }
     }
 }

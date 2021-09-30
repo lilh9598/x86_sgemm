@@ -5,6 +5,7 @@
 #include <cstring>
 #include <iostream>
 
+// M N 必须是MR NR的倍数
 #define MR 16
 #define NR 6
 
