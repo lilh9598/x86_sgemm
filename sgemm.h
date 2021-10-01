@@ -6,7 +6,7 @@
 #include <iostream>
 
 // M N 必须是MR NR的倍数
-#define MR 16
+#define MR 32
 #define NR 6
 
 #define Mc 256
