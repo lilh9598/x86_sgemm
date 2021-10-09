@@ -15,7 +15,7 @@
 #define MEM_ALIGN 64
 // A L2 : Kc * Mc * 4 < L2
 // B L3 : Kc * N * 4
-// packb L1 : 16 * kc * 4 < L1
+// packb L1 : NR * kc * 4 < L1
 
 #define A(i, j) a[(j)*lda + i]
 #define B(i, j) b[(j)*ldb + i]
