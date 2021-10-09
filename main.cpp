@@ -56,9 +56,14 @@ int main(int argc, char *argv[]) {
     {
         const int iteration = 50;
         float *n_c = new float[iteration * ROUND_UP(M, MR) * ROUND_UP(N, NR)];
+        float *n_a = new float[iteration * M * K];
+        float *n_b = new float[iteration * K * N];
+        std::generate(n_b, n_b + iteration * K * N, []() { return (rand() % 1000) / 1000.f - 0.5f; });
+        std::generate(n_a, n_a + iteration * M * K, []() { return (rand() % 1000) / 1000.f - 0.5f; });
+
         auto begin = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < iteration; i++) {
-            my_sgemm(M, N, K, a, lda, b, ldb, n_c + i * ROUND_UP(M, MR) * ROUND_UP(N, NR), ldc);
+            my_sgemm(M, N, K, n_a + i * M * K, lda, n_b + i * K * N, ldb, n_c + i * ROUND_UP(M, MR) * ROUND_UP(N, NR), ldc);
         }
         auto end = std::chrono::high_resolution_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
