@@ -58,6 +58,7 @@ int main(int argc, char *argv[]) {
         float *n_c = new float[iteration * ROUND_UP(M, MR) * ROUND_UP(N, NR)];
         float *n_a = new float[iteration * M * K];
         float *n_b = new float[iteration * K * N];
+        std::generate(n_c, n_c + M * ldc, []() { return 0; });
         std::generate(n_b, n_b + iteration * K * N, []() { return (rand() % 1000) / 1000.f - 0.5f; });
         std::generate(n_a, n_a + iteration * M * K, []() { return (rand() % 1000) / 1000.f - 0.5f; });
 
@@ -71,6 +72,8 @@ int main(int argc, char *argv[]) {
         printf("my_sgemm perf               : %.5lf gflop/s\n", perf);
         printf("my_sgemm duration           : %d ms\n", elapsed / iteration);
         delete []n_c;
+        delete []n_a;
+        delete []n_b;
     }
 
     delete[] a;

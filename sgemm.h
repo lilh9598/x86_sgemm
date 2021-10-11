@@ -10,7 +10,7 @@
 #define NR 6
 
 #define Mc 256
-#define Kc 256
+#define Kc 512
 
 #define MEM_ALIGN 64
 // A L2 : Kc * Mc * 4 < L2
