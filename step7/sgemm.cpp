@@ -41,14 +41,14 @@ void packA_KcxMc(const float *a, int lda, int k, int mr, float *packa) {
     for (int p = 0; p < k; p++) {
         int i = 0;
         while (i < m_r16) {
-            auto v1 = _mm256_loadu_ps(a);
-            auto v2 = _mm256_loadu_ps(a + 8);
+            auto v1 = _mm256_loadu_ps(a + i);
+            auto v2 = _mm256_loadu_ps(a + 8 + i);
             _mm256_storeu_ps(packa + i, v1);
             _mm256_storeu_ps(packa + 8 + i, v2);
             i += 16;
         }
         while (i < m_r8) {
-            auto v1 = _mm256_loadu_ps(a);
+            auto v1 = _mm256_loadu_ps(a + i);
             _mm256_storeu_ps(packa + i, v1);
             i += 8;
         }
