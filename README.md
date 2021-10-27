@@ -12,4 +12,4 @@ step3 Kc Mc tile                    : 21.718gflop/s	<br/>
 step4 Pack B                        : 21.569gflop/s	<br/>
 step5 Pack A                        : 48.245gflop/s	<br/>
 step6 kernel 16x6                   : 53.913gflop/s	<br/>
-step7 asm kernel16x6/aligned memory : 67.108gflop/s (82%)	<br/>
+step7 asm kernel16x6/aligned memory : 67.108gflop/s (82.8%)	<br/>
